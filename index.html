@@ -1,0 +1,490 @@
+<html lang="en" >
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Angular Material style sheet -->
+  <link rel="stylesheet" href="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.css">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/icon?family=Material+Icons">
+  <link rel="stylesheet" href="https://rawgit.com/iamisti/mdDataTable/master/dist/md-data-table-style.css">
+</head>
+<body ng-app="BlankApp" ng-controller="ctrl" ng-cloak>
+<!--   <md-toolbar>
+	toolbar
+  </md-toolbar> -->
+  <div flex layout="row">
+	  <div flex="60" md-whiteframe="5">
+			<md-toolbar>
+			  <span class="md-toolbar-tools md-whiteframe-1dp">
+				Configure a parameters !
+				<span flex></span>
+				  <md-button class="md-fab md-mini md-primary" aria-label="Print Char" ng-click="printChart()">
+					<md-icon><i class="material-icons">print</i></md-icon>           
+				</md-button>         
+			  </span>      
+			</md-toolbar>
+			<mdt-table 
+					   mdt-row="{
+								'data': runs,
+								'column-keys': [
+									'last',
+									'instanceType',
+									'machines',
+									'files',
+									'time',
+									'estimate',
+									'bill',
+									'log'
+								]
+								}">
+			  <mdt-header-row>
+				<mdt-column align-rule="left">Last Run</mdt-column>
+				<mdt-column align-rule="left">Instance Type</mdt-column>
+				<mdt-column align-rule="right">#Machines</mdt-column>
+				<mdt-column align-rule="right">#Files</mdt-column>
+				<mdt-column align-rule="right">Time mm</mdt-column>
+				<mdt-column align-rule="right">Estimate $</mdt-column>
+				<mdt-column align-rule="right">Bill $</mdt-column>
+				<mdt-column align-rule="right">Logs</mdt-column>
+			  </mdt-header-row>
+				<mdt-custom-cell column-key="log">
+					<span ng-click="clientScope.myMethodToExecute()">
+					<ng-md-icon icon="file_download"></ng-md-icon> 
+					</span>
+				</mdt-custom-cell>
+			</mdt-table>			
+			<div class="md-padding">
+			  <h3>Execution Logs</h3>
+			  <div class="demo-md-panel-content">
+			    <p>Number of files downloaded: {{ progress }}</p>
+			    <p>Number of files Processed: {{ cprogress }}</p>
+			    <p>Number of files uploaded to S3: {{ ioprogress }}</p>
+			    <p>Avg. time to download from S3: {{ dataSets[3][0][0] }}</p>
+			    <p>Avg. time to Compute: {{ dataSets[3][0][1] }}</p>
+			    <p>Avg. time to upload to S3: {{ dataSets[3][0][2] }}</p>
+			  </div>
+			</div>
+	  </div>
+	  <md-sidenav flex="40" md-is-locked-open="true" class="md-whiteframe-z1">
+		<md-content>
+			<md-toolbar class="md-whiteframe-2dp md-toolbar-tools" id="toaster">
+				<b>AWS Cluster Metrics</b>
+				<span flex></span>      
+				<md-button class="md-raised" ng-click="compareStuff()">Compare Stuff</md-button> 
+			</md-toolbar>
+			<!-- Comparison Chart https://codepen.io/k3no/pen/KgLvrg -->
+			<div class="md-padding">
+				<canvas id="chartjs" class="chart chart-pie" chart-data="dataSets[3]" chart-labels="series" chart-series="seriesC" chart-options="optionsC" chart-dataset-override="datasetOverrideC" chart-click="onClick"></canvas>
+			</div>
+			<div class="md-padding">
+				<canvas id="chartjs" class="chart-base" chart-type="type" chart-data="dataSets[0]" chart-labels="labels" chart-series="series" chart-dataset-override="datasetOverrideB" chart-options="optionsB" chart-click="onClick"></canvas>
+			</div>
+
+			<!-- <md-divider></md-divider> -->
+
+			<div ng-show="!running">
+				<div>
+				<md-slider-container flex layout="row" ng-repeat="label in runlabels" layout="row" layout-align="center center">
+				  <!-- <md-input-container flex="10"> -->
+					  <md-chip flex="5">{{newRun[label]}}</md-chip>
+				  <!-- </md-input-container> -->
+				  <span flex="20">{{label}}</span>
+				  <md-slider flex="60" md-discrete step="1" min="1" max="50" class="md-warn" ng-model="newRun[label]" aria-label="red" id="red-slider">
+				  </md-slider>
+				</md-slider-container>
+				</div>
+				<br/>
+				<div layout-gt-sm="row">
+					<md-input-container class="md-block" flex-gt-sm>
+					  <label>Algo Runtime (s)</label>
+					  <input name="clientName" ng-model="timeTakenByOneFile">
+					  <!-- <div class="hint" style="font-size: 10px; color: grey;">Before baseline run, we assume algorithm takes above time as default</div> -->
+					</md-input-container>
+
+					<md-input-container class="md-block" flex-gt-sm>
+					  <label>Instance Type</label>
+					  <md-select name="type" ng-model="newRun.instanceType" required>
+						<md-option ng-repeat="instanceType in instanceTypes track by $index" ng-value="instanceType.name">
+							{{instanceType.name}} (${{instanceType.price}})
+						</md-option>
+					  </md-select>
+					</md-input-container>
+				</div>
+				<md-content flex layout="row" layout-padding>
+				  <md-button flex class="md-raised md-warn">.ZIP File Upload</md-button>
+				  <md-input-container flex>
+					<label>Entry Point</label>
+					<input ng-model="model.entrypoint" type="email">
+				  </md-input-container>
+				</md-content>
+				<div layout="row" style="width: 100%">
+				  <md-button class="md-raised md-warn" ng-click="addNewRun()" ng-show="!running" flex>RUN</md-button>
+				</div>
+			</div>
+			<div ng-show="running">	
+				<div flex layout="row">
+					<md-progress-circular flex md-mode="determinate" class="md-warn" value="{{ioprogress}}"></md-progress-circular>
+					<md-progress-circular flex md-mode="determinate" class="md-primary md-hue-2" value="{{cprogress}}"></md-progress-circular>
+					<md-progress-circular flex md-mode="determinate" class="md-accent" value="{{progress}}"></md-progress-circular>
+				</div>
+				<div flex layout="row">
+					<span flex>Download</span>
+					<span flex>Process</span>
+					<span flex>Upload</span>
+				</div>		
+				<div layout="row" style="width: 100%">
+				  <md-button class="md-raised md-warn" ng-click="toggleRunView()" flex>STOP</md-button>
+				</div>
+			</div>
+		</md-content>
+      </md-sidenav>
+	</div>
+
+  
+  <!-- Angular Material requires Angular.js Libraries -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-sanitize.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-animate.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-aria.min.js"></script>
+  <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.5.5/angular-messages.min.js"></script>
+
+  <!-- Angular Material Library -->
+  <script src="https://ajax.googleapis.com/ajax/libs/angular_material/1.1.0/angular-material.min.js"></script>
+  
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.13.0/moment.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.3.0/Chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/angular.chartjs/latest/angular-chart.min.js"></script>
+
+	<!-- Angular Table -->
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/2.1.3/jquery.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/underscore.js/1.8.3/underscore-min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/lodash.js/3.10.1/lodash.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/angular-material-icons/0.6.0/angular-material-icons.min.js"></script>
+  <script src="https://rawgit.com/iamisti/mdDataTable/master/dist/md-data-table-templates.js"></script>
+  <script src="https://rawgit.com/iamisti/mdDataTable/master/dist/md-data-table.js"></script>
+
+  <!-- Your application bootstrap  -->
+  <script type="text/javascript">    
+	/**
+	 * You must include the dependency on 'ngMaterial' 
+	 */
+	angular.module('BlankApp', ['chart.js', 'ngMessages', 'ngMaterial', 'mdDataTable', 'ngMdIcons'])
+	.config(function($mdIconProvider, $mdProgressCircularProvider) {
+		// $mdIconProvider
+		//   .iconSet('device', 'img/icons/sets/device-icons.svg', 24);
+		$mdProgressCircularProvider.configure({
+		  progressSize: 100,
+		  strokeWidth: 20,
+		  duration: 800
+		});
+	  })
+	.controller('ctrl', ['$scope', '$mdToast', '$interval', function($scope, $mdToast, $interval) {
+	  $scope.hideCompare = true;
+	  $scope.dataSets = {};
+	  $scope.type = 'line';
+	  $scope.dIndex = 0;
+
+	  $scope.isDisabled = true;
+
+	  $scope.runlabels = ['machines', 'files']
+	  var datetime = new Date();
+	  $scope.newRun = {
+			last: datetime.toString(),
+			instanceType: 'T2.nano 0.5G 1vCPU',
+			machines: 1,
+			files: 1,
+			time: 0,
+			estimate: 0,
+			bill: 0
+		};
+
+	  $scope.runs = [
+	  ];
+
+		$scope.timeTakenByOneFile = 900;
+		$scope.instanceTypes = [
+			{
+				name: "T2.nano 0.5G 1vCPU",
+				price: 0.0058
+			},
+			{
+				name: "T2.micro 1G 1vCPU",
+				price: 0.0116
+			},
+			{
+				name: "T2.small 2G 1vCPU",
+				price: 0.023
+			},
+			{
+				name: "M4.large 8G 2vCPU",
+				price: 0.1
+			},
+			{
+				name: "c4.large 3.75G 2vCPU",
+				price: 0.1
+			},
+			{
+				name: "p2.xlarge 61G 4vCPU",
+				price: 0.9
+			}
+		]
+		$scope.instancePrice = {
+			"T2.nano 0.5G 1vCPU": 0.0058,
+			"T2.micro 1G 1vCPU": 0.0116,
+			"T2.small 2G 1vCPU": 0.023,
+			"M4.large 8G 2vCPU": 0.1,
+			"c4.large 3.75G 2vCPU": 0.1,
+			"p2.xlarge 61G 4vCPU": 0.9
+			}
+
+	$scope.toggleRunView = function() {
+		$scope.running = false;
+	}
+	  $scope.addNewRun = function() {
+	  	var newRun = $scope.newRun;
+		newRun.time = (($scope.newRun.machines/$scope.newRun.files) * $scope.timeTakenByOneFile)/60 + ''
+		newRun.estimate = $scope.instancePrice[$scope.newRun.instanceType] * $scope.newRun.time + ''
+		newRun.machines += ''
+		newRun.files += ''
+		newRun.last = datetime.toString()
+		console.log(newRun);
+		$scope.runs.push(newRun);
+		$scope.running = !$scope.running;
+
+	  }
+
+	  // Dataset select from md-tabs:
+	  $scope.dataSet = function(ds) {
+		$scope.theme = $scope.themes[ds];
+		$scope.dIndex = ds;
+	  };
+
+	  $scope.running = false
+	  $scope.compareStuff = function() {
+		$scope.hideCompare = !$scope.hideCompare;
+	  }
+
+	  $scope.updateCompare = function() {
+		$scope.dataSets[3] = [
+		  [avgArray($scope.dataSets[0][0]), avgArray($scope.dataSets[0][1]), avgArray($scope.dataSets[0][2])]
+		];
+		// console.log($scope.dataSets[3]);
+		// console.log($scope.dataSets[1]);
+		// console.log($scope.dataSets[2]);    
+	  }
+
+		var timeFormat = 'MM/DD/YYYY HH:mm:ss';
+
+		function newDate(seconds) {
+			return moment().add(seconds, 'seconds').toDate();
+		}
+
+		function newDateString(seconds) {
+			return moment().add(seconds, 'seconds').format(timeFormat);
+		}
+
+		function newTimestamp(seconds) {
+			return moment().add(seconds, 'seconds').unix();
+		}
+
+	  // $scope.labels = ["Machines", "Files", "Time", "Money"];
+	  $scope.labels = [newDate(0),
+					newDate(1),
+					newDate(2),
+					newDate(3),
+					newDate(4),
+					newDate(5),
+					newDate(6)];
+	  $scope.series = ["Network", "I/O", "Compute"];
+	  $scope.dataSets[0] = [
+		[{x: newDateString(0), y: 0}],
+		[{x: newDateString(0), y: 150}],
+		[{x: newDateString(0), y: 300}]
+	  ];
+
+	  function getRandomInt(min, max) {
+	    min = Math.ceil(min);
+	    max = Math.floor(max);
+	    return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+	  }
+
+	  function getRandomIntInclusive(min, max) {
+	    min = Math.ceil(min);
+	    max = Math.floor(max);
+	    return Math.floor(Math.random() * (max - min + 1)) + min; //The maximum is inclusive and the minimum is inclusive 
+	  }
+
+	  function randomScalingFactor() {
+	  		return Math.round(Samples.utils.rand(-100, 100));
+	  	};
+
+	  $interval(function() {
+	        // Do something every 500 milliseconds
+	        if ($scope.dataSets[0].length > 0) {
+	        	$scope.labels.push(newDate($scope.labels.length));
+
+	        	for (var index = 0; index < $scope.dataSets[0].length; ++index) {
+	        		if (typeof $scope.dataSets[0][index][0] === "object") {
+	        			$scope.dataSets[0][index].push({
+	        				x: newDate($scope.dataSets[0][index].length),
+	        				y: getRandomIntInclusive(50,250),
+	        			});
+	        			$scope.dataSets[3][0][index] = ($scope.dataSets[3][0][index] + getRandomIntInclusive(0,250)) / ($scope.dataSets[0][index].length + 1) 
+	        		} else {
+	        			$scope.dataSets[0][index].push(getRandomIntInclusive(1,250));
+	        		}
+	        	}
+	        }
+
+	  }, 1000);
+
+		$scope.progress = 0;
+		$interval(function() {
+		    // Do something every 500 milliseconds
+			$scope.progress += 1
+			if ($scope.progress > 100) {
+			  $scope.progress = 30;
+			}
+		}, 1000);
+		$scope.ioprogress = 0;
+		$interval(function() {
+		    // Do something every 500 milliseconds
+			$scope.ioprogress += 1
+			if ($scope.ioprogress > 100) {
+			  $scope.ioprogress = 30;
+			}
+		}, 1500);
+		$scope.cprogress = 0;
+		$interval(function() {
+		    // Do something every 500 milliseconds
+			$scope.cprogress += 1
+			if ($scope.cprogress > 100) {
+			  $scope.cprogress = 30;
+			}
+		}, 2000);
+
+	  $scope.dataSets[1] = [
+		[100, 29, 300, 220, 200, 30, 30, 220, 40, 160, 300, 460]
+	  ];
+	  $scope.dataSets[2] = [
+		[130, 130, 120, 140, 60, 200, 260, 200, 167, 18, 120, 100]
+	  ];
+
+	  function avgArray(arr) {
+		var sum = arr.reduce(function(a, b) {
+		  return a + b;
+		});
+		var avg = sum / arr.length;
+		return avg.toFixed();
+	  }
+
+	  avgIO = avgArray($scope.dataSets[0][0].map(data => {return data.y}))
+	  avgCompute = avgArray($scope.dataSets[0][1].map(data => {return data.y}))
+	  avgNetwork = avgArray($scope.dataSets[0][2].map(data => {return data.y}))
+	  $scope.dataSets[3] = [
+		[avgIO, avgCompute, avgNetwork]
+	  ];
+	  console.log($scope.dataSets[3])
+
+	  $scope.datasetOverrideB = [{
+		label: "Network",
+		fill: false,
+		lineTension: 0.2,
+		backgroundColor: 
+		  "rgba(255,0,0,1)",
+		borderColor: 
+		  "rgba(255,0,0,1)",
+	  },{
+		label: "I/O",
+		fill: false,
+		lineTension: 0.2,
+		backgroundColor: "#42A5F5",
+		borderColor: "#42A5F5"
+	  },{
+		label: "Compute",
+		fill: false,
+		lineTension: 0.2,
+		backgroundColor: 
+		  "#8BC34A",
+		borderColor: 
+		  "#8BC34A"
+	  }];
+
+	  $scope.datasetOverrideC = [{
+		backgroundColor: [
+		  "rgba(255,0,0,0.6)",
+		  "rgba(0,100,192,0.4)",
+		  "rgba(255,105,180,0.3)"
+		],
+		borderColor: [
+		  "rgba(255,0,0,1)",
+		  "rgba(0,100,192,1)",
+		  "rgba(255,105,180,0.4)"
+		]
+
+	  }];
+
+	  $scope.onClick = function(points, evt) {
+		console.log(points, evt);
+	  };
+
+	  $scope.optionsB = {
+	  	animation: false,
+		title: {
+		  display: true,
+		  text: 'Time series of Processing Metrics',
+		  fontColor: 'rgba(255,0,0,0.8)',
+		  fontSize: 16
+		},
+		legend: {
+			display: true
+		},
+		scales: {
+		  yAxes: [{
+
+		  	scaleLabel: {
+		  		display: true,
+			  	labelString: "Units",
+		  	},
+			ticks: {
+				beginAtZero: true,
+				min: 1,
+			}
+		  }],
+		  xAxes: [{
+			type: "time",
+			distribution: 'linear',
+			time: {
+				format: timeFormat,
+				// unit: 'second',
+				tooltipFormat: timeFormat
+			},
+		  	scaleLabel: {
+		  		display: true,
+			  	labelString: "Time in seconds",
+		  	},
+            ticks: {
+				beginAtZero: true,
+				min: 1,
+            	stepSize: 5
+            }
+	        }]
+		},
+	  };	 
+
+	  $scope.optionsC = {
+		rotation: 0.5 * Math.PI,
+		title: {
+		  display: true,
+		  text: 'Average usage distribution',
+		  fontColor: 'rgba(0,0,0,0.4)',
+		  fontSize: 16
+		},
+		legend: {
+		  display: true
+		}
+	  }
+	}]);
+
+  </script>
+  
+</body>
+</html>
